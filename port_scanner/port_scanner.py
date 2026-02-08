@@ -38,6 +38,17 @@ def scan_range(target, start_port, end_port, timeout, threads):
     return open_ports
 
 
+def grab_banner(target, port, timeout):
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.settimeout(timeout)
+            s.connect((target, port))
+            banner = s.recv(1024).decode().strip()
+            return banner
+    except (socket.timeout, ConnectionRefusedError, OSError):
+        return "unknown"
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Simple port scanner")
 
@@ -45,6 +56,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("-sp", type=int, default=1, help="Start port (default: 1)")
     parser.add_argument("-ep", type=int, default=65535, help="End port (default: 65535)")
     parser.add_argument("-t", type=float, default=1.0, help="Connection timeout in seconds (default: 1.0)")
+    parser.add_argument("-nb", action="store_false", help="Disable service discovery (banner grabbing)")
     parser.add_argument("-threads", type=int, default=10, help="Number of threads to use (default: 10)")
 
     return parser.parse_args()
@@ -71,12 +83,14 @@ def validate_args(args: argparse.Namespace):
 def main():
     args = parse_args()
     validate_args(args)
+
     open_ports = {}
     scan_times = {}
+    banners = {}
 
-    print("Target:", args.targets[0])
     print("Port range:", args.sp, "-", args.ep)
     print("Timeout:", args.t)
+    print("Banner grabbing:", "enabled" if args.nb else "disabled")
     print("Threads:", args.threads)
     print("-----------------------------")
 
@@ -86,8 +100,14 @@ def main():
         start_time = time.perf_counter()
         open_ports[target] = scan_range(target, args.sp, args.ep, args.t, args.threads)
         end_time = time.perf_counter()
+
         scan_times[target] = end_time - start_time
         print(f"    Found {len(open_ports[target])} open ports in {scan_times[target]:.2f} seconds")
+
+    if args.nb:
+        for target in open_ports:
+            for port in open_ports[target]:
+                banners[(target, port)] = grab_banner(target, port, args.t)
 
     print(f"\n[*] Scan complete! ({sum(scan_times.values()):.2f} seconds)")
 
@@ -95,7 +115,8 @@ def main():
         print(f"[{target}]")
         print(f"    {'PORT':<8}{'STATE':<8}{'SERVICE':<8}")
         for port in open_ports[target]:
-            print(f"    {port:<8}{'open':<8}{'unknown':<8}")
+            banner = banners.get((target, port), "unknown")
+            print(f"    {port:<8}{'open':<8}{banner:<8}")
 
 if __name__ == "__main__":
     main()
