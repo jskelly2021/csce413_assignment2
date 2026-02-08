@@ -46,7 +46,27 @@ def grab_banner(target, port, timeout):
             banner = s.recv(1024).decode().strip()
             return banner
     except (socket.timeout, ConnectionRefusedError, OSError):
-        return "unknown"
+        return "no banner"
+
+
+def grab_banners(target, ports, timeout=2.0, threads=10):
+    banners = {}
+
+    with ThreadPoolExecutor(max_workers=threads) as ex:
+        futures  = {
+            ex.submit(grab_banner, target, port, timeout): port
+            for port in ports
+        }
+
+        for future in as_completed(futures):
+            port = futures[future]
+            try:
+                banners[(target, port)] = future.result()
+            except Exception as e:
+                banners[(target, port)] = "no banner"
+                continue
+
+    return banners
 
 
 def parse_args() -> argparse.Namespace:
@@ -56,7 +76,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("-sp", type=int, default=1, help="Start port (default: 1)")
     parser.add_argument("-ep", type=int, default=65535, help="End port (default: 65535)")
     parser.add_argument("-t", type=float, default=1.0, help="Connection timeout in seconds (default: 1.0)")
-    parser.add_argument("-nb", action="store_false", help="Disable service discovery (banner grabbing)")
+    parser.add_argument("-nb", action="store_true", help="Disable service discovery (banner grabbing)")
     parser.add_argument("-threads", type=int, default=10, help="Number of threads to use (default: 10)")
 
     return parser.parse_args()
@@ -104,16 +124,18 @@ def main():
         scan_times[target] = end_time - start_time
         print(f"    Found {len(open_ports[target])} open ports in {scan_times[target]:.2f} seconds")
 
-    if args.nb:
-        for target in open_ports:
-            for port in open_ports[target]:
-                banners[(target, port)] = grab_banner(target, port, args.t)
+    if not args.nb:
+        for target, ports in open_ports.items():
+            if not ports:
+                continue
+            banners.update(grab_banners(target, ports, args.t))
 
     print(f"\n[*] Scan complete! ({sum(scan_times.values()):.2f} seconds)")
 
     for target in open_ports:
         print(f"[{target}]")
         print(f"    {'PORT':<8}{'STATE':<8}{'SERVICE':<8}")
+
         for port in open_ports[target]:
             banner = banners.get((target, port), "unknown")
             print(f"    {port:<8}{'open':<8}{banner:<8}")
