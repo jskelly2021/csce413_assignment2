@@ -18,8 +18,6 @@ def scan_port(target, port, timeout):
 def scan_range(target, start_port, end_port, timeout, threads):
     open_ports = []
 
-    print(f"[*] Scanning {target} from port {start_port} to {end_port}")
-
     with ThreadPoolExecutor(max_workers=threads) as executor:
         futures = {
             executor.submit(scan_port, target, port, timeout): port
@@ -34,7 +32,6 @@ def scan_range(target, start_port, end_port, timeout, threads):
                 continue
 
             if is_open:
-                print(f"    {target} {port}: open")
                 open_ports.append(port)
 
     open_ports.sort()
@@ -44,25 +41,25 @@ def scan_range(target, start_port, end_port, timeout, threads):
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Simple port scanner")
 
-    parser.add_argument("--target", help="Target hostname or IP address", required=True)
-    parser.add_argument("--sport", type=int, default=1, help="Start port (default: 1)")
-    parser.add_argument("--eport", type=int, default=65535, help="End port (default: 65535)")
-    parser.add_argument("--timeout", type=float, default=1.0, help="Connection timeout in seconds (default: 1.0)")
-    parser.add_argument("--threads", type=int, default=10, help="Number of threads to use (default: 10)")
+    parser.add_argument("targets", nargs="+", help="Target hostname(s) or IP address(es)")
+    parser.add_argument("-sp", type=int, default=1, help="Start port (default: 1)")
+    parser.add_argument("-ep", type=int, default=65535, help="End port (default: 65535)")
+    parser.add_argument("-t", type=float, default=1.0, help="Connection timeout in seconds (default: 1.0)")
+    parser.add_argument("-threads", type=int, default=10, help="Number of threads to use (default: 10)")
 
     return parser.parse_args()
 
 
 def validate_args(args: argparse.Namespace):
-    if args.sport < 1 or args.sport > 65535 or args.eport < 1 or args.eport > 65535:
+    if args.sp < 1 or args.sp > 65535 or args.ep < 1 or args.ep > 65535:
         print("Error: Start and end port must be between 1 and 65535")
         sys.exit(1)
 
-    if args.sport > args.eport:
+    if args.sp > args.ep:
         print("Error: Start port cannot be greater than end port")
         sys.exit(1)
 
-    if args.timeout <= 0:
+    if args.t <= 0:
         print("Error: Timeout must be a positive number")
         sys.exit(1)
 
@@ -74,23 +71,31 @@ def validate_args(args: argparse.Namespace):
 def main():
     args = parse_args()
     validate_args(args)
+    open_ports = {}
+    scan_times = {}
 
-    print("Target:", args.target)
-    print("Port range:", args.sport, "-", args.eport)
-    print("Timeout:", args.timeout)
+    print("Target:", args.targets[0])
+    print("Port range:", args.sp, "-", args.ep)
+    print("Timeout:", args.t)
     print("Threads:", args.threads)
-    print("-----------------------------\n")
+    print("-----------------------------")
 
-    start_time = time.perf_counter()
-    open_ports = scan_range(args.target, args.sport, args.eport, args.timeout, args.threads)
-    end_time = time.perf_counter()
+    for target in args.targets:
+        print(f"\n[*] Scanning {target} from port {args.sp} to {args.ep}")
 
-    print(f"\n[+] Scan complete!")
-    print(f"[+] Found {len(open_ports)} open ports in {end_time - start_time:.2f} seconds")
+        start_time = time.perf_counter()
+        open_ports[target] = scan_range(target, args.sp, args.ep, args.t, args.threads)
+        end_time = time.perf_counter()
+        scan_times[target] = end_time - start_time
+        print(f"    Found {len(open_ports[target])} open ports in {scan_times[target]:.2f} seconds")
 
-    for port in open_ports:
-        print(f"    Port {port}: open")
+    print(f"\n[*] Scan complete! ({sum(scan_times.values()):.2f} seconds)")
 
+    for target in open_ports:
+        print(f"[{target}]")
+        print(f"    {'PORT':<8}{'STATE':<8}{'SERVICE':<8}")
+        for port in open_ports[target]:
+            print(f"    {port:<8}{'open':<8}{'unknown':<8}")
 
 if __name__ == "__main__":
     main()
