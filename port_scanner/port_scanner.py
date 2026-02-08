@@ -4,6 +4,7 @@ import socket
 import time
 import sys
 
+
 def scan_port(target, port, timeout):
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -38,18 +39,55 @@ def scan_range(target, start_port, end_port, timeout, threads):
     return open_ports
 
 
+def recv_banner(sock: socket.socket, max_bytes: int = 4096) -> bytes:
+    data = bytearray()
+    while len(data) < max_bytes:
+        try:
+            chunk = sock.recv(min(1024, max_bytes - len(data)))
+            if not chunk:
+                break
+            data.extend(chunk)
+            if b"\n" in chunk and len(data) >= 64:
+                break
+        except Exception as e:
+            break
+
+    return bytes(data)
+
+
 def grab_banner(target, port, timeout):
+    probes = [
+        f"GET / HTTP/1.1\r\nHost: {target}\r\nConnection: close\r\n\r\n".encode("ascii", "ignore"),
+        b"\r\n",
+        b"HEAD / HTTP/1.0\r\n\r\n",
+    ]
+
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.settimeout(timeout)
             s.connect((target, port))
-            banner = s.recv(1024).decode().strip()
-            return banner
-    except (socket.timeout, ConnectionRefusedError, OSError):
+
+            data = recv_banner(s)
+            if not data:
+                for probe in probes:
+                    try:
+                        s.sendall(probe)
+                        data = recv_banner(s)
+                        if data:
+                            break
+                    except Exception as e:
+                        continue
+
+            if not data:
+                return "no banner"
+
+            return data.decode("utf-8", errors="replace").strip()
+
+    except Exception as e:
         return "no banner"
 
 
-def grab_banners(target, ports, timeout=2.0, threads=10):
+def grab_banners(target, ports, timeout, threads):
     banners = {}
 
     with ThreadPoolExecutor(max_workers=threads) as ex:
@@ -63,10 +101,29 @@ def grab_banners(target, ports, timeout=2.0, threads=10):
             try:
                 banners[(target, port)] = future.result()
             except Exception as e:
-                banners[(target, port)] = "no banner"
                 continue
 
     return banners
+
+
+def guess_service(banner):
+    if not banner:
+        return "unknown"
+
+    if "http" in banner.lower():
+        return "http"
+    elif "ssh" in banner.lower():
+        return "ssh"
+    elif "ftp" in banner.lower():
+        return "ftp"
+    elif "smtp" in banner.lower():
+        return "smtp"
+    elif "mysql" in banner.lower():
+        return "mysql"
+    elif "redis" in banner.lower():
+        return "redis"
+    else:
+        return "unknown"
 
 
 def parse_args() -> argparse.Namespace:
@@ -110,7 +167,7 @@ def main():
 
     print("Port range:", args.sp, "-", args.ep)
     print("Timeout:", args.t)
-    print("Banner grabbing:", "enabled" if args.nb else "disabled")
+    print("Banner grabbing:", "disabled" if args.nb else "enabled")
     print("Threads:", args.threads)
     print("-----------------------------")
 
@@ -128,7 +185,7 @@ def main():
         for target, ports in open_ports.items():
             if not ports:
                 continue
-            banners.update(grab_banners(target, ports, args.t))
+            banners.update(grab_banners(target, ports, args.t, args.threads))
 
     print(f"\n[*] Scan complete! ({sum(scan_times.values()):.2f} seconds)")
 
@@ -137,8 +194,8 @@ def main():
         print(f"    {'PORT':<8}{'STATE':<8}{'SERVICE':<8}")
 
         for port in open_ports[target]:
-            banner = banners.get((target, port), "unknown")
-            print(f"    {port:<8}{'open':<8}{banner:<8}")
+            service = guess_service(banners.get((target, port)))
+            print(f"    {port:<8}{'open':<8}{service}")
 
 if __name__ == "__main__":
     main()
