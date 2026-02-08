@@ -2,6 +2,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import argparse
 import socket
 import time
+import ipaddress
 import sys
 
 
@@ -126,6 +127,23 @@ def guess_service(banner):
         return "unknown"
 
 
+def expand_addresses(addresses):
+    expanded = []
+
+    for entry in addresses:
+        entry = entry.strip()
+
+        if "/" in entry:
+            network = ipaddress.IPv4Network(entry, strict=False)
+            for ip in network:
+                expanded.append(str(ip))
+        else:
+            ip = ipaddress.IPv4Address(entry)
+            expanded.append(str(ip))
+
+    return expanded
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Simple port scanner")
 
@@ -161,17 +179,20 @@ def main():
     args = parse_args()
     validate_args(args)
 
+    targets = expand_addresses(args.targets)
+
     open_ports = {}
     scan_times = {}
     banners = {}
 
+    print("Number of targets:", len(targets))
     print("Port range:", args.sp, "-", args.ep)
     print("Timeout:", args.t)
     print("Banner grabbing:", "disabled" if args.nb else "enabled")
     print("Threads:", args.threads)
     print("-----------------------------")
 
-    for target in args.targets:
+    for target in targets:
         print(f"\n[*] Scanning {target} from port {args.sp} to {args.ep}")
 
         start_time = time.perf_counter()
