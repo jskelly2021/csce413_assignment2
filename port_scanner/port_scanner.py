@@ -211,6 +211,9 @@ def main():
     print(f"\n[*] Scan complete! ({sum(scan_times.values()):.2f} seconds)")
 
     for target in open_ports:
+        if not open_ports[target]:
+            continue
+
         print(f"[{target}]")
         print(f"    {'PORT':<8}{'STATE':<8}{'SERVICE':<8}")
 

@@ -1,0 +1,96 @@
+[
+    {
+        "Name": "csce413_assignment2_vulnerable_network",
+        "Id": "aea6a1130946c62ad6f9950c4bfa91da52641230d474021fb432225d42724fc4",
+        "Created": "2026-02-08T22:38:00.611356666Z",
+        "Scope": "local",
+        "Driver": "bridge",
+        "EnableIPv4": true,
+        "EnableIPv6": false,
+        "IPAM": {
+            "Driver": "default",
+            "Options": null,
+            "Config": [
+                {
+                    "Subnet": "172.20.0.0/16",
+                    "Gateway": "172.20.0.1"
+                }
+            ]
+        },
+        "Internal": false,
+        "Attachable": false,
+        "Ingress": false,
+        "ConfigFrom": {
+            "Network": ""
+        },
+        "ConfigOnly": false,
+        "Options": {},
+        "Labels": {
+            "com.docker.compose.config-hash": "888e8b3b081f18261743f66d1aa2e405adf9b327c5faafeb1ecba00bb6d95a78",
+            "com.docker.compose.network": "vulnerable_network",
+            "com.docker.compose.project": "csce413_assignment2",
+            "com.docker.compose.version": "5.0.2"
+        },
+        "Containers": {
+            "01ca78e244dcbf2bc556ac8ca3dd60d0294c6d9a3f8825cb5e29ede51960cc2f": {
+                "Name": "2_network_database",
+                "EndpointID": "6750135c6aae085d4b56116ebf1441a01e5b6a4bb2a32524dfec8c2110a61071",
+                "MacAddress": "66:2f:dc:ca:75:9c",
+                "IPv4Address": "172.20.0.11/16",
+                "IPv6Address": ""
+            },
+            "38ffe93635eacc52a05aa554161890ec3f2d84f778ed03d613d03de61b1651fa": {
+                "Name": "2_network_honeypot",
+                "EndpointID": "77396cc2d1cf67949af64ff96a3e2478468a99ebfbe6c803a851c2aee11d87eb",
+                "MacAddress": "06:d8:2b:ff:ce:ed",
+                "IPv4Address": "172.20.0.30/16",
+                "IPv6Address": ""
+            },
+            "42e9e3785f0d3b7834607f625249bb59611e88a1ee7a29b3f1baf3069976e0cb": {
+                "Name": "2_network_port_knocking",
+                "EndpointID": "b594e1fc1771c42855c7483f2c6e2798111c0dc84d5006aa663e913cde99a48a",
+                "MacAddress": "e6:2e:8f:bd:e5:5b",
+                "IPv4Address": "172.20.0.40/16",
+                "IPv6Address": ""
+            },
+            "734bfc162e7f8b7648ee70b50171ba43451a759cbdd4f64cd8fa7806fa77fef0": {
+                "Name": "2_network_secret_api",
+                "EndpointID": "8945517f6fdbed86e6e4163895fdc53027e55ab9e7c8ca1bf19674a9fdcf9ffe",
+                "MacAddress": "92:79:11:2a:c5:09",
+                "IPv4Address": "172.20.0.21/16",
+                "IPv6Address": ""
+            },
+            "a1bc4a501d6b29acb25ec4976973fa53c521d146817f0bc9c26cedea9a8b4c19": {
+                "Name": "2_network_secret_ssh",
+                "EndpointID": "84b51c5138e7c0f6bcc4f592b351a2be59c6717a6f4da941a4364d87579f5aa3",
+                "MacAddress": "12:d2:1b:4a:41:15",
+                "IPv4Address": "172.20.0.20/16",
+                "IPv6Address": ""
+            },
+            "bc6dbe30d8b87ba1ef87f22e7ca5236dbf1e1fb21a068db6b0ccc224c60a3074": {
+                "Name": "2_network_redis",
+                "EndpointID": "0996ad401f27337e0af2d2a69f086d1b3f83bcdfc666a67043241b6830661afb",
+                "MacAddress": "42:11:ae:5d:cc:04",
+                "IPv4Address": "172.20.0.22/16",
+                "IPv6Address": ""
+            },
+            "cc5b5b5b826b91afb0bd60ef63086ef9193aeb0bcfc55a62e007e1491a306238": {
+                "Name": "2_network_webapp",
+                "EndpointID": "caa316e7e3c0df2fa10d70f0bdd6b4c21a23fafe76643f829437531a62dea575",
+                "MacAddress": "c2:22:6c:62:17:d5",
+                "IPv4Address": "172.20.0.10/16",
+                "IPv6Address": ""
+            }
+        },
+        "Status": {
+            "IPAM": {
+                "Subnets": {
+                    "172.20.0.0/16": {
+                        "IPsInUse": 10,
+                        "DynamicIPsAvailable": 65526
+                    }
+                }
+            }
+        }
+    }
+]
