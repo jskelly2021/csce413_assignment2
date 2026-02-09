@@ -5,6 +5,7 @@ import logging
 import socket
 import time
 import threading
+import subprocess
 
 DEFAULT_KNOCK_SEQUENCE = [1234, 5678, 9012]
 DEFAULT_PROTECTED_PORT = 2222
@@ -13,12 +14,43 @@ DEFAULT_SEQUENCE_WINDOW = 10.0
 knock_attempts = {}
 lock = threading.Lock()
 
+
 def setup_logging():
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s - %(levelname)s - %(message)s",
         handlers=[logging.StreamHandler()],
     )
+
+
+def open_protected_port(ip, protected_port):
+    """Open the protected port using firewall rules."""
+
+    subprocess.run([
+        "sudo", "iptables",
+        "-A", "INPUT",
+        "-p", "tcp",
+        "-s", ip,
+        "--dport", str(protected_port),
+        "-j", "ACCEPT"
+    ], check=True)
+
+    logging.info("Protected port %s is now open for IP %s", protected_port, ip)
+
+
+def close_protected_port(ip, protected_port):
+    """Close the protected port using firewall rules."""
+
+    subprocess.run([
+        "sudo", "iptables",
+        "-D", "INPUT",
+        "-p", "tcp",
+        "-s", ip,
+        "--dport", str(protected_port),
+        "-j", "ACCEPT"
+    ], check=True)
+
+    logging.info("Protected port %s is now closed for IP %s", protected_port, ip)
 
 
 def check_sequence(ip, sequence, window_seconds, protected_port):
@@ -43,36 +75,33 @@ def check_sequence(ip, sequence, window_seconds, protected_port):
 
     return True
 
+
 def listen_on_port(port, sequence, window_seconds, protected_port):
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.bind(("0.0.0.0", port))
-        s.listen()
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.bind(("0.0.0.0", port))
+            s.listen()
 
-        logging.info("Listening for knocks on port %s...", port)
+            logging.info("Listening for knocks on port %s...", port)
 
-        while True:
-            conn, addr = s.accept()
-            knock_time = time.time()
+            while True:
+                conn, addr = s.accept()
+                knock_time = time.time()
 
-            with lock:
-                knock_attempts[addr[0]].append((port, knock_time))
+                with lock:
+                    if addr[0] not in knock_attempts:
+                        knock_attempts[addr[0]] = []
 
-            if check_sequence(addr[0], sequence, window_seconds, protected_port):
-                    open_protected_port(protected_port)
+                    knock_attempts[addr[0]].append((port, knock_time))
 
-            conn.close()
+                if check_sequence(addr[0], sequence, window_seconds, protected_port):
+                        open_protected_port(addr[0], protected_port)
 
+                conn.close()
 
-def open_protected_port(protected_port):
-    """Open the protected port using firewall rules."""
-    # TODO: Use iptables/nftables to allow access to protected_port.
-    logging.info("TODO: Open firewall for port %s", protected_port)
+    except Exception as e:
+        logging.error("Error listening on port %s: %s", port, e)
 
-
-def close_protected_port(protected_port):
-    """Close the protected port using firewall rules."""
-    # TODO: Remove firewall rules for protected_port.
-    logging.info("TODO: Close firewall for port %s", protected_port)
 
 
 def listen_for_knocks(sequence, window_seconds, protected_port):
@@ -80,12 +109,6 @@ def listen_for_knocks(sequence, window_seconds, protected_port):
     logger = logging.getLogger("KnockServer")
     logger.info("Listening for knocks: %s", sequence)
     logger.info("Protected port: %s", protected_port)
-
-    # TODO: Create UDP or TCP listeners for each knock port.
-    # TODO: Track each source IP and its progress through the sequence.
-    # TODO: Enforce timing window per sequence.
-    # TODO: On correct sequence, call open_protected_port().
-    # TODO: On incorrect sequence, reset progress.
 
     for port in sequence:
         threading.Thread(target=listen_on_port, args=(port, sequence, window_seconds, protected_port), daemon=True).start()
