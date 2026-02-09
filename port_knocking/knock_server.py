@@ -26,12 +26,24 @@ def setup_logging():
 def open_protected_port(ip, protected_port):
     """Open the protected port using firewall rules."""
 
+    check = subprocess.run([
+        "iptables",
+        "-C","INPUT",
+        "-p","tcp",
+        "-s",ip,
+        "--dport",str(protected_port),
+        "-j","ACCEPT"],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL
+    )
+
     subprocess.run([
-        "sudo", "iptables",
-        "-A", "INPUT",
+        "iptables",
+        "-I", "INPUT", "1",
         "-p", "tcp",
         "-s", ip,
-        "--dport", str(protected_port),
+        "--dport",
+        str(protected_port),
         "-j", "ACCEPT"
     ], check=True)
 
@@ -42,11 +54,12 @@ def close_protected_port(ip, protected_port):
     """Close the protected port using firewall rules."""
 
     subprocess.run([
-        "sudo", "iptables",
+        "iptables",
         "-D", "INPUT",
         "-p", "tcp",
         "-s", ip,
-        "--dport", str(protected_port),
+        "--dport",
+        str(protected_port),
         "-j", "ACCEPT"
     ], check=True)
 
@@ -95,13 +108,12 @@ def listen_on_port(port, sequence, window_seconds, protected_port):
                     knock_attempts[addr[0]].append((port, knock_time))
 
                 if check_sequence(addr[0], sequence, window_seconds, protected_port):
-                        open_protected_port(addr[0], protected_port)
+                    open_protected_port(addr[0], protected_port)
 
                 conn.close()
 
     except Exception as e:
         logging.error("Error listening on port %s: %s", port, e)
-
 
 
 def listen_for_knocks(sequence, window_seconds, protected_port):
