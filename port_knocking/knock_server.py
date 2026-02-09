@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Starter template for the port knocking server."""
 
 import argparse
 import logging
 import socket
 import time
+import threading
 
 DEFAULT_KNOCK_SEQUENCE = [1234, 5678, 9012]
 DEFAULT_PROTECTED_PORT = 2222
@@ -17,6 +17,20 @@ def setup_logging():
         format="%(asctime)s - %(levelname)s - %(message)s",
         handlers=[logging.StreamHandler()],
     )
+
+
+def listen_on_port(port):
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(("0.0.0.0", port))
+        s.listen()
+
+        print(f"Listening for knocks on port {port}...")
+
+        while True:
+            conn, addr = s.accept()
+            knock_time = time.time()
+
+            conn.close()
 
 
 def open_protected_port(protected_port):
@@ -42,6 +56,9 @@ def listen_for_knocks(sequence, window_seconds, protected_port):
     # TODO: Enforce timing window per sequence.
     # TODO: On correct sequence, call open_protected_port().
     # TODO: On incorrect sequence, reset progress.
+
+    for port in sequence:
+        threading.Thread(target=listen_on_port, args=(port,), daemon=True).start()
 
     while True:
         time.sleep(1)
