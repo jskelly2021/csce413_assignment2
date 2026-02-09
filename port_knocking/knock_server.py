@@ -10,6 +10,8 @@ DEFAULT_KNOCK_SEQUENCE = [1234, 5678, 9012]
 DEFAULT_PROTECTED_PORT = 2222
 DEFAULT_SEQUENCE_WINDOW = 10.0
 
+knock_attempts = {}
+lock = threading.Lock()
 
 def setup_logging():
     logging.basicConfig(
@@ -19,16 +21,44 @@ def setup_logging():
     )
 
 
-def listen_on_port(port):
+def check_sequence(ip, sequence, window_seconds, protected_port):
+    with lock:
+        if not len(knock_attempts[ip]) == len(sequence):
+            return False
+
+        if knock_attempts[ip][-1][1] - knock_attempts[ip][0][1] > window_seconds:
+            logging.info("Sequence window exceeded for IP %s", ip)
+            knock_attempts[ip].clear()
+            return False
+
+        for i, (port, _) in enumerate(knock_attempts[ip]):
+            if port != sequence[i]:
+                logging.info("Incorrect knock sequence from IP %s", ip)
+                knock_attempts[ip].clear()
+                return False
+
+        knock_attempts[ip].clear()
+
+    logging.info("Correct knock sequence from IP %s. Opening protected port.", ip)
+
+    return True
+
+def listen_on_port(port, sequence, window_seconds, protected_port):
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.bind(("0.0.0.0", port))
         s.listen()
 
-        print(f"Listening for knocks on port {port}...")
+        logging.info("Listening for knocks on port %s...", port)
 
         while True:
             conn, addr = s.accept()
             knock_time = time.time()
+
+            with lock:
+                knock_attempts[addr[0]].append((port, knock_time))
+
+            if check_sequence(addr[0], sequence, window_seconds, protected_port):
+                    open_protected_port(protected_port)
 
             conn.close()
 
@@ -58,7 +88,7 @@ def listen_for_knocks(sequence, window_seconds, protected_port):
     # TODO: On incorrect sequence, reset progress.
 
     for port in sequence:
-        threading.Thread(target=listen_on_port, args=(port,), daemon=True).start()
+        threading.Thread(target=listen_on_port, args=(port, sequence, window_seconds, protected_port), daemon=True).start()
 
     while True:
         time.sleep(1)
