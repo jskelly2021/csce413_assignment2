@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-"""Starter template for the port knocking client."""
 
 import argparse
 import socket
@@ -12,13 +11,13 @@ DEFAULT_DELAY = 0.3
 
 def send_knock(target, port, delay):
     """Send a single knock to the target port."""
-    # TODO: Choose UDP or TCP knocks based on your design.
-    # Example TCP knock stub:
     try:
-        with socket.create_connection((target, port), timeout=1.0):
-            pass
-    except OSError:
-        pass
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.settimeout(2.0)
+            s.connect((target, port))
+    except Exception as e:
+        print(f"[-] Failed to knock on port {port}: {e}")
+
     time.sleep(delay)
 
 
@@ -30,12 +29,14 @@ def perform_knock_sequence(target, sequence, delay):
 
 def check_protected_port(target, protected_port):
     """Try connecting to the protected port after knocking."""
-    # TODO: Replace with real service connection if needed.
     try:
-        with socket.create_connection((target, protected_port), timeout=2.0):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.settimeout(2.0)
+            s.connect((target, protected_port))
             print(f"[+] Connected to protected port {protected_port}")
-    except OSError:
-        print(f"[-] Could not connect to protected port {protected_port}")
+
+    except Exception as e:
+        print(f"[-] Could not connect to protected port {protected_port}: {e}")
 
 
 def parse_args():
