@@ -23,14 +23,13 @@ def setup_logging():
     )
 
 
-def open_protected_port(ip, protected_port):
+def open_protected_port(protected_port):
     """Open the protected port using firewall rules."""
 
     check = subprocess.run([
         "iptables",
         "-C","INPUT",
         "-p","tcp",
-        "-s",ip,
         "--dport",str(protected_port),
         "-j","ACCEPT"],
         stdout=subprocess.DEVNULL,
@@ -41,29 +40,55 @@ def open_protected_port(ip, protected_port):
         "iptables",
         "-I", "INPUT", "1",
         "-p", "tcp",
-        "-s", ip,
         "--dport",
         str(protected_port),
         "-j", "ACCEPT"
     ], check=True)
 
-    logging.info("Protected port %s is now open for IP %s", protected_port, ip)
+    logging.info("Protected port %s is now open", protected_port)
 
 
-def close_protected_port(ip, protected_port):
+def close_protected_port(protected_port):
     """Close the protected port using firewall rules."""
 
     subprocess.run([
         "iptables",
         "-D", "INPUT",
         "-p", "tcp",
-        "-s", ip,
         "--dport",
         str(protected_port),
         "-j", "ACCEPT"
     ], check=True)
 
-    logging.info("Protected port %s is now closed for IP %s", protected_port, ip)
+    logging.info("Protected port %s is now closed", protected_port)
+
+
+def setup_iptables(protected_port, sequence=DEFAULT_KNOCK_SEQUENCE):
+    """Set up iptables rules to block the protected port by default."""
+
+    subprocess.run([
+        "iptables",
+        "-F"
+    ], check=True)
+
+    for port in sequence:
+        subprocess.run([
+            "iptables",
+            "-A", "INPUT",
+            "-p", "tcp",
+            "--dport", str(port),
+            "-j", "ACCEPT"
+        ], check=True)
+
+    subprocess.run([
+        "iptables",
+        "-A", "INPUT",
+        "-p", "tcp",
+        "--dport", str(protected_port),
+        "-j", "DROP"
+    ], check=True)
+
+    logging.info("iptables configured to block protected port %s by default", protected_port)
 
 
 def check_sequence(ip, sequence, window_seconds, protected_port):
@@ -89,6 +114,23 @@ def check_sequence(ip, sequence, window_seconds, protected_port):
     return True
 
 
+def listen_on_protected_port(protected_port):
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.bind(("0.0.0.0", protected_port))
+            s.listen()
+
+            logging.info("Listening on protected port %s...", protected_port)
+
+            while True:
+                conn, addr = s.accept()
+                logging.info("Connection received on protected port from %s", addr[0])
+                conn.close()
+
+    except Exception as e:
+        logging.error("Error listening on protected port %s: %s", protected_port, e)
+
+
 def listen_on_port(port, sequence, window_seconds, protected_port):
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -108,7 +150,7 @@ def listen_on_port(port, sequence, window_seconds, protected_port):
                     knock_attempts[addr[0]].append((port, knock_time))
 
                 if check_sequence(addr[0], sequence, window_seconds, protected_port):
-                    open_protected_port(addr[0], protected_port)
+                    open_protected_port(protected_port)
 
                 conn.close()
 
@@ -124,6 +166,8 @@ def listen_for_knocks(sequence, window_seconds, protected_port):
 
     for port in sequence:
         threading.Thread(target=listen_on_port, args=(port, sequence, window_seconds, protected_port), daemon=True).start()
+
+    threading.Thread(target=listen_on_protected_port, args=(protected_port,), daemon=True).start()
 
     while True:
         time.sleep(1)
@@ -160,6 +204,7 @@ def main():
     except ValueError:
         raise SystemExit("Invalid sequence. Use comma-separated integers.")
 
+    setup_iptables(args.protected_port, sequence)
     listen_for_knocks(sequence, args.window, args.protected_port)
 
 
