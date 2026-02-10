@@ -7,6 +7,7 @@ import sys
 
 
 def scan_port(target, port, timeout):
+    ''''Attempt to connect to the specified target and port with a timeout. Returns True if the port is open, False otherwise.'''
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.settimeout(timeout)
@@ -18,6 +19,7 @@ def scan_port(target, port, timeout):
 
 
 def scan_range(target, start_port, end_port, timeout, threads):
+    '''Scan a range of ports on the target using multiple threads. Returns a sorted list of open ports.'''
     open_ports = []
 
     with ThreadPoolExecutor(max_workers=threads) as executor:
@@ -41,6 +43,7 @@ def scan_range(target, start_port, end_port, timeout, threads):
 
 
 def recv_banner(sock: socket.socket, max_bytes: int = 4096) -> bytes:
+    '''Receive data from the socket with a timeout. Returns the received data as bytes.'''
     data = bytearray()
     while len(data) < max_bytes:
         try:
@@ -57,6 +60,7 @@ def recv_banner(sock: socket.socket, max_bytes: int = 4096) -> bytes:
 
 
 def grab_banner(target, port, timeout):
+    '''Attempt to grab a banner from the specified target and port. Returns the banner string or "no banner" if unsuccessful.'''
     probes = [
         f"GET / HTTP/1.1\r\nHost: {target}\r\nConnection: close\r\n\r\n".encode("ascii", "ignore"),
         b"\r\n",
@@ -89,6 +93,7 @@ def grab_banner(target, port, timeout):
 
 
 def grab_banners(target, ports, timeout, threads):
+    '''Grab banners from a list of open ports using multiple threads. Returns a dictionary mapping (target, port) to banner string.'''
     banners = {}
 
     with ThreadPoolExecutor(max_workers=threads) as ex:
@@ -108,6 +113,7 @@ def grab_banners(target, ports, timeout, threads):
 
 
 def guess_service(banner):
+    '''Scan the banner for common service keywords to make a guess about the service running on the port.'''
     if not banner:
         return "unknown"
 
@@ -128,6 +134,7 @@ def guess_service(banner):
 
 
 def expand_addresses(addresses):
+    '''Expand a list of IP addresses and CIDR notations into a flat list of IP addresses.'''
     expanded = []
 
     for entry in addresses:
@@ -145,6 +152,7 @@ def expand_addresses(addresses):
 
 
 def parse_args() -> argparse.Namespace:
+    '''Parse command-line arguments and return a Namespace object.'''
     parser = argparse.ArgumentParser(description="Simple port scanner")
 
     parser.add_argument("targets", nargs="+", help="Target hostname(s) or IP address(es)")
@@ -158,6 +166,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def validate_args(args: argparse.Namespace):
+    '''Validate command-line arguments and exit with an error message if invalid.'''
     if args.sp < 1 or args.sp > 65535 or args.ep < 1 or args.ep > 65535:
         print("Error: Start and end port must be between 1 and 65535")
         sys.exit(1)
